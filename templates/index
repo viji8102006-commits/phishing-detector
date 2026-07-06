@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PhishGuard — Phishing Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #11151c;
+    --card: #181d26;
+    --line: #2a313d;
+    --text: #e8e6df;
+    --muted: #8b93a1;
+    --safe: #4f9d69;
+    --suspicious: #c5453d;
+    --warn: #d6a23c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+  body { display: flex; align-items: center; justify-content: center; padding: 32px 16px; }
+  .wrap { width: 100%; max-width: 580px; }
+  .eyebrow { font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  h1 { font-family: 'Space Mono', monospace; font-size: 30px; font-weight: 700; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 24px; line-height: 1.5; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 22px; }
+  .tab {
+    flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: transparent; color: var(--muted); font-family: 'Space Mono', monospace;
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab.active { background: var(--line); color: var(--text); border-color: #4a5566; }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  textarea, input[type="text"] {
+    width: 100%; background: #0d1117; border: 1px solid var(--line); border-radius: 8px;
+    padding: 13px 14px; font-family: 'Space Mono', monospace; font-size: 14px;
+    color: var(--text); outline: none; resize: vertical; transition: border-color 0.2s;
+  }
+  textarea { min-height: 130px; }
+  textarea:focus, input[type="text"]:focus { border-color: #4a5566; }
+
+  button.analyze-btn {
+    width: 100%; margin-top: 14px; background: var(--warn); color: #0d1117;
+    border: none; border-radius: 8px; padding: 13px; font-family: 'Space Mono', monospace;
+    font-weight: 700; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase;
+    cursor: pointer; transition: opacity 0.2s;
+  }
+  button.analyze-btn:hover { opacity: 0.88; }
+
+  /* Result panel */
+  .result { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); display: none; }
+  .result.show { display: block; }
+
+  .verdict-badge {
+    display: inline-block; padding: 6px 18px; border-radius: 99px;
+    font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 18px;
+  }
+  .verdict-badge.safe { background: rgba(79,157,105,0.15); color: var(--safe); border: 1px solid var(--safe); }
+  .verdict-badge.suspicious { background: rgba(197,69,61,0.15); color: var(--suspicious); border: 1px solid var(--suspicious); }
+
+  .score-bar-wrap { margin-bottom: 20px; }
+  .score-label { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; display: flex; justify-content: space-between; }
+  .score-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease, background 0.5s ease; }
+
+  .flags-title { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .flags { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .flags li { font-size: 14px; line-height: 1.5; padding-left: 20px; position: relative; color: var(--text); }
+  .flags li::before { content: "▸"; position: absolute; left: 0; color: var(--warn); }
+  .flags li.good::before { color: var(--safe); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Task 04 / Cybersecurity</div>
+  <h1>PhishGuard</h1>
+  <p class="sub">Paste a URL or email text to analyze it for phishing indicators. The system checks for suspicious patterns, social engineering tactics, and known impersonation tricks.</p>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" id="tabUrl" onclick="switchTab('url')">🔗 URL Analysis</button>
+      <button class="tab" id="tabEmail" onclick="switchTab('email')">✉️ Email Analysis</button>
+    </div>
+
+    <div id="urlPane">
+      <input type="text" id="urlInput" placeholder="https://example.com/login?verify=account" />
+    </div>
+    <div id="emailPane" style="display:none;">
+      <textarea id="emailInput" placeholder="Paste email text here...&#10;&#10;Example:&#10;Dear Customer, your account has been suspended. Click here immediately to verify your identity and avoid account closure."></textarea>
+    </div>
+
+    <button class="analyze-btn" onclick="analyze()">Analyze Now</button>
+
+    <div class="result" id="result">
+      <div id="verdictBadge" class="verdict-badge">—</div>
+
+      <div class="score-bar-wrap">
+        <div class="score-label">
+          <span>Threat Score</span>
+          <span id="scoreText">0</span>
+        </div>
+        <div class="score-bar">
+          <div class="score-fill" id="scoreFill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="flags-title">Detection Findings</div>
+      <ul class="flags" id="flagsList"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentMode = 'url';
+
+function switchTab(mode) {
+  currentMode = mode;
+  document.getElementById('tabUrl').classList.toggle('active', mode === 'url');
+  document.getElementById('tabEmail').classList.toggle('active', mode === 'email');
+  document.getElementById('urlPane').style.display = mode === 'url' ? 'block' : 'none';
+  document.getElementById('emailPane').style.display = mode === 'email' ? 'block' : 'none';
+  document.getElementById('result').classList.remove('show');
+}
+
+async function analyze() {
+  const content = currentMode === 'url'
+    ? document.getElementById('urlInput').value.trim()
+    : document.getElementById('emailInput').value.trim();
+
+  if (!content) return;
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: currentMode, content })
+    });
+    const data = await res.json();
+    render(data);
+  } catch (err) {
+    alert('Could not reach the server. Is the Flask app running?');
+  }
+}
+
+function render(data) {
+  const result = document.getElementById('result');
+  const badge = document.getElementById('verdictBadge');
+  const scoreText = document.getElementById('scoreText');
+  const scoreFill = document.getElementById('scoreFill');
+  const flagsList = document.getElementById('flagsList');
+
+  const isSuspicious = data.verdict === 'suspicious';
+  const MAX_SCORE = 15;
+  const pct = Math.min((data.score / MAX_SCORE) * 100, 100);
+  const color = isSuspicious ? '#c5453d' : '#4f9d69';
+
+  badge.textContent = isSuspicious ? '⚠ SUSPICIOUS' : '✓ SAFE';
+  badge.className = 'verdict-badge ' + data.verdict;
+
+  scoreText.textContent = data.score + ' / ' + MAX_SCORE;
+  scoreFill.style.width = pct + '%';
+  scoreFill.style.background = color;
+
+  flagsList.innerHTML = '';
+  data.flags.forEach(f => {
+    const li = document.createElement('li');
+    li.textContent = f;
+    if (!isSuspicious && data.flags.length === 1) li.classList.add('good');
+    flagsList.appendChild(li);
+  });
+
+  result.classList.add('show');
+}
+
+// Allow pressing Enter in URL input to trigger analyze
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') analyze();
+});
+</script>
+</body>
+</html>
